@@ -1,17 +1,84 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title>Viral Replicator</title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="1894.6">
-  <style type="text/css">
-    span.s1 {font-kerning: none}
+  <meta charset="UTF-8">
+  <title>Viral Video Cloner</title>
+  <style>
+    body { font-family: sans-serif; background: #f0f0f0; padding: 30px; }
+    input, button { padding: 10px; margin: 5px; width: 300px; }
+    button { background: #0077ff; color: white; border: none; cursor: pointer; }
+    .table { margin-top: 30px; border-collapse: collapse; width: 100%; }
+    .table th, .table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
   </style>
 </head>
 <body>
-<h1 style="margin: 0.0px 0.0px 16.1px 0.0px; font: 24.0px Times; color: #000000; -webkit-text-stroke: #000000"><span class="s1"><b>fetch('https://viral-video-clone-app.onrender.com/process', {</b></span></h1>
-<h1 style="margin: 0.0px 0.0px 16.1px 0.0px; font: 24.0px Times; color: #000000; -webkit-text-stroke: #000000; min-height: 29.0px"><span class="s1"><b></b></span><br></h1>
+  <h1>🎬 Clone & Republish Viral TikToks</h1>
+
+  <input id="tiktokUrl" placeholder="Paste TikTok URL here" />
+  <button onclick="submit()">Clone Video</button>
+  <div id="status"></div>
+
+  <h2>📋 Processed Videos</h2>
+  <table class="table" id="videoTable">
+    <tr>
+      <th>TikTok URL</th>
+      <th>Status</th>
+      <th>Transcript</th>
+      <th>Rewritten Caption</th>
+      <th>Preview</th>
+    </tr>
+  </table>
+
+  <script>
+    // Point this at your Render backend
+    const API_BASE = 'https://viral-video-clone-app.onrender.com';
+
+    // Kick off processing a new TikTok
+    async function submit() {
+      const url = document.getElementById('tiktokUrl').value;
+      document.getElementById('status').innerText = '⏳ Processing...';
+
+      try {
+        const res = await fetch(`${API_BASE}/process`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tiktokUrl: url })
+        });
+        const data = await res.json();
+        document.getElementById('status').innerText = data.message;
+        fetchVideos();
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ Error processing request';
+        console.error(err);
+      }
+    }
+
+    // Load all processed videos from Airtable
+    async function fetchVideos() {
+      const res = await fetch('https://api.airtable.com/v0/YOUR_BASE_ID/Videos', {
+        headers: { 'Authorization': 'Bearer YOUR_API_KEY' }
+      });
+      const json = await res.json();
+      const rows = json.records.map(r => `
+        <tr>
+          <td><a href="${r.fields.TikTokURL}" target="_blank">View</a></td>
+          <td>${r.fields.Status}</td>
+          <td>${(r.fields.Transcript||'').slice(0,50)}…</td>
+          <td>${(r.fields.GPTRewrite||'').slice(0,50)}…</td>
+          <td>${r.fields.FinalVideoURL
+             ? `<a href="${r.fields.FinalVideoURL}" target="_blank">▶️</a>` 
+             : ''}</td>
+        </tr>
+      `).join('');
+      document.getElementById('videoTable').innerHTML = `
+        <tr>
+          <th>TikTok URL</th><th>Status</th>
+          <th>Transcript</th><th>Rewritten Caption</th><th>Preview</th>
+        </tr>` + rows;
+    }
+
+    // Fetch on page load
+    fetchVideos();
+  </script>
 </body>
 </html>

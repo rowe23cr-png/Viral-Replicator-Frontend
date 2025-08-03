@@ -36,16 +36,24 @@
   </p>
 
   <!-- Input + Button -->
-  <div class="flex space-x-2 mb-8 w-full max-w-md">
+    <!-- Input + Button Section -->
+  <div class="flex flex-col space-y-2 mb-8 w-full max-w-md">
     <input id="tiktokUrl"
            type="text"
            placeholder="Paste TikTok URL here"
-           class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-    <button id="cloneBtn" onclick="submit()" class="btn-neon">
+           class="px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+    <input id="email"
+           type="email"
+           placeholder="Your email address"
+           class="px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+    <button id="cloneBtn"
+            onclick="submit()"
+            class="btn-neon py-2">
       Clone Video
     </button>
   </div>
   <p id="status" class="text-gray-500 mb-6"></p>
+
 
   <!-- Simple Card Container -->
   <div id="cards" class="w-full max-w-xl grid gap-4">
@@ -55,19 +63,33 @@
   <script>
     const API = 'https://viral-video-clone-app.onrender.com';
 
-    async function submit() {
-      const url = document.getElementById('tiktokUrl').value.trim();
-      if (!url) return alert('Please paste a TikTok URL!');
-      document.getElementById('status').innerText = '⏳ Processing…';
-      const res = await fetch(`${API}/process`, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ tiktokUrl:url })
-      });
-      const { message } = await res.json();
-      document.getElementById('status').innerText = message;
-      fetchCards();
-    }
+  async function submit() {
+  const url   = document.getElementById('tiktokUrl').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const status = document.getElementById('status');
+
+  if (!url || !email) {
+    status.innerText = '⚠️ TikTok URL and email are required';
+    return;
+  }
+
+  status.innerText = '⏳ Processing…';
+
+  try {
+    const res = await fetch(`${API}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tiktokUrl: url, email })
+    });
+    const { message } = await res.json();
+    status.innerText = message;
+    fetchCards();  // reload results
+  } catch (err) {
+    console.error(err);
+    status.innerText = '❌ Error processing request';
+  }
+}
+
 
     async function fetchCards() {
       const table = 'https://api.airtable.com/v0/YOUR_BASE_ID/Videos';

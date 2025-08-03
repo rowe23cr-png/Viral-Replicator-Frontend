@@ -1,149 +1,75 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>🎥 Clone & Republish</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <title>Clone & Republish</title>
   <style>
-    body {
-      font-family: sans-serif;
-      max-width: 600px;
-      margin: 20px auto;
-      padding: 0 10px;
-    }
-    input, button {
-      padding: 8px;
-      margin: 4px 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    #gallery {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-around;
-      margin-top: 20px;
-    }
-    .card {
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      padding: 10px;
-      margin: 8px;
-      width: 200px;
-      text-align: center;
-    }
-    .thumb {
-      max-width: 100%;
-      border-radius: 4px;
-    }
-    .play-btn {
-      display: block;
-      margin-top: 8px;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    #message {
-      min-height: 1.5em;
-      color: #444;
-    }
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 1rem; }
+    input, button { width: 100%; padding: .5rem; margin: .5rem 0; box-sizing: border-box; }
+    #cards > div { border: 1px solid #eee; padding: .5rem; margin: .5rem 0; }
+    img, video { display: block; margin: .5rem 0; max-width: 100%; }
   </style>
 </head>
 <body>
   <h1>🎥 Clone & Republish</h1>
   <p>Paste any TikTok link below, and AI will rewrite, generate an avatar video, then post to 9 platforms.</p>
 
-  <form id="clone-form">
-    <input
-      type="url"
-      id="url-input"
-      placeholder="https://www.tiktok.com/…"
-      required
-    />
-    <input
-      type="email"
-      id="email-input"
-      placeholder="your email"
-      required
-    />
-    <button type="submit" id="clone-btn">Clone Video</button>
-  </form>
+  <input id="url"    type="url"    placeholder="https://www.tiktok.com/…" />
+  <input id="email"  type="email"  placeholder="your-email@example.com" />
+  <button id="submit">Clone Video</button>
+  <p id="status"></p>
 
-  <p id="message"></p>
-
-  <!-- Gallery container -->
-  <div id="gallery"></div>
-
-  <!-- Template for one video card -->
-  <template id="card-tpl">
-    <div class="card">
-      <img class="thumb" alt="video thumbnail" />
-      <h4 class="status"></h4>
-      <p class="caption"></p>
-      <a class="play-btn" target="_blank"></a>
-    </div>
-  </template>
+  <h2>Recent Videos</h2>
+  <div id="cards">Loading…</div>
 
   <script>
-    // Your Render backend URL
-    const API_BASE = "https://viral-video-clone-app.onrender.com";
+    const BACKEND = "https://viral-video-clone-app.onrender.com";
 
-    // 1) Fetch & display the last 10 videos from Airtable
+    // load the 10 most recent records and render them
     async function loadVideos() {
+      const gallery = document.getElementById("cards");
+      gallery.textContent = "Loading…";
       try {
-        const res = await fetch(`${API_BASE}/videos`);
-        if (!res.ok) throw new Error("Could not fetch videos");
-        const videos = await res.json();
-
-        const gallery = document.getElementById("gallery");
-        gallery.innerHTML = "";
-
-        const tpl = document.getElementById("card-tpl");
-        videos.forEach(v => {
-          const card = tpl.content.cloneNode(true);
-          card.querySelector(".thumb").src = v.fields.ThumbnailURL;
-          card.querySelector(".status").textContent = v.fields.Status;
-          card.querySelector(".caption").textContent = v.fields.GPTRewrite;
-
-          const playBtn = card.querySelector(".play-btn");
-          if (v.fields.FinalVideoURL) {
-            playBtn.href = v.fields.FinalVideoURL;
-            playBtn.textContent = "▶️ Watch";
-          } else {
-            playBtn.href = "#";
-            playBtn.textContent = "⌛️ Pending";
-          }
-
+        const res = await fetch(`${BACKEND}/videos`);
+        if (!res.ok) throw new Error("Network error");
+        const list = await res.json();
+        gallery.innerHTML = "";  // clear
+        list.forEach(r => {
+          const card = document.createElement("div");
+          card.innerHTML = `
+            <p><strong>TikTokURL:</strong> <a href="${r.TikTokURL}" target="_blank">${r.TikTokURL}</a></p>
+            <p><strong>Transcript:</strong> ${r.Transcript}</p>
+            <p><strong>GPTRewrite:</strong> ${r.GPTRewrite}</p>
+            ${r.ThumbnailURL ? `<img src="${r.ThumbnailURL}" alt="thumbnail">` : ""}
+            ${r.FinalVideoURL ? `<video controls src="${r.FinalVideoURL}"></video>` : ""}
+            <p><strong>Status:</strong> ${r.Status}</p>
+            <p><strong>Email:</strong> ${r.Email}</p>
+          `;
           gallery.appendChild(card);
         });
+        if (list.length === 0) {
+          gallery.textContent = "No videos yet.";
+        }
       } catch (err) {
         console.error(err);
-        document.getElementById("message").textContent = "Failed to load videos";
+        document.getElementById("status").textContent = "Failed to load videos";
       }
     }
 
-    // 2) Handle the “Clone Video” form
-    document.getElementById("clone-form").addEventListener("submit", async e => {
-      e.preventDefault();
-      const url = document.getElementById("url-input").value.trim();
-      const email = document.getElementById("email-input").value.trim();
-      const msg = document.getElementById("message");
-
-      if (!url || !email) {
-        msg.textContent = "TikTok URL and email are required";
-        return;
-      }
-
-      msg.textContent = "Processing…";
-
+    // handle the “Clone Video” button
+    document.getElementById("submit").addEventListener("click", async () => {
+      const url   = document.getElementById("url").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const msg   = document.getElementById("status");
+      msg.textContent = "⏳ Processing…";
       try {
-        const res = await fetch(`${API_BASE}/process`, {
+        const res = await fetch(`${BACKEND}/process`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tiktokUrl: url, email })
         });
         if (!res.ok) throw new Error("Server error");
-
         msg.textContent = "✅ Content processed and saved.";
-        // reload the gallery so the new item shows up
         await loadVideos();
       } catch (err) {
         console.error(err);
@@ -151,14 +77,14 @@
       }
     });
 
-    // 3) When the page loads, fetch & show cards
+    // on page load, fetch & show cards
     window.addEventListener("DOMContentLoaded", loadVideos);
   </script>
 </body>
 </html>
 
+
     fetchCards();
   </script>
 </body>
 </html>
-

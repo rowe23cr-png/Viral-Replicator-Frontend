@@ -90,28 +90,23 @@
   }
 }
 
-
-    async function fetchCards() {
-      const table = 'https://api.airtable.com/v0/YOUR_BASE_ID/Videos';
-      const res = await fetch(table, {
-        headers:{ Authorization:'Bearer YOUR_API_KEY' }
-      });
-      const { records } = await res.json();
-      const cards = document.getElementById('cards');
-      cards.innerHTML = '';  // clear
-      for (let r of records) {
-        const f = r.fields;
-        const card = document.createElement('div');
-        card.className = 'glass p-4 flex items-center space-x-4';
-        card.innerHTML = `
-          <img src="${f.ThumbnailURL}" class="w-16 h-16 object-cover rounded" />
-          <div class="flex-1">
-            <p class="font-medium">${f.Status}</p>
-            <p class="text-sm text-gray-700">${(f.GPTRewrite||'').slice(0,40)}…</p>
-          </div>`;
-        cards.append(card);
-      }
-    }
+async function fetchCards() {
+  const res = await fetch(`${API}/videos`);
+  const records = await res.json();
+  const cards = document.getElementById('cards');
+  cards.innerHTML = '';
+  for (let f of records) {
+    const card = document.createElement('div');
+    card.className = 'glass p-4 flex items-center space-x-4';
+    card.innerHTML = `
+      <img src="${f.ThumbnailURL}" class="w-16 h-16 object-cover rounded" />
+      <div class="flex-1">
+        <p class="font-medium">${f.Status}</p>
+        <p class="text-sm text-gray-700">${(f.GPTRewrite||'').slice(0,40)}…</p>
+      </div>`;
+    cards.append(card);
+  }
+}
 
     // initial load
     fetchCards();

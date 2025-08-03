@@ -1,84 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Viral Video Cloner</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: sans-serif; background: #f0f0f0; padding: 30px; }
-    input, button { padding: 10px; margin: 5px; width: 300px; }
-    button { background: #0077ff; color: white; border: none; cursor: pointer; }
-    .table { margin-top: 30px; border-collapse: collapse; width: 100%; }
-    .table th, .table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    /* Glass effect */
+    .glass {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+    }
+    /* Neon button */
+    .btn-neon {
+      background: linear-gradient(90deg, #0077ff, #ff0055);
+      color: white;
+      padding: .5rem 1rem;
+      border-radius: .5rem;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .btn-neon:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px #ff0055, 0 0 20px #0077ff;
+    }
   </style>
 </head>
-<body>
-  <h1>🎬 Clone & Republish Viral TikToks</h1>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
 
-  <input id="tiktokUrl" placeholder="Paste TikTok URL here" />
-  <button onclick="submit()">Clone Video</button>
-  <div id="status"></div>
+  <!-- Header -->
+  <h1 class="text-3xl font-bold mb-4">🎬 Clone & Republish</h1>
+  <p class="text-gray-600 mb-6 text-center max-w-md">
+    Paste any TikTok link below, and AI will rewrite, generate an avatar video, then post to 9 platforms.
+  </p>
 
-  <h2>📋 Processed Videos</h2>
-  <table class="table" id="videoTable">
-    <tr>
-      <th>TikTok URL</th>
-      <th>Status</th>
-      <th>Transcript</th>
-      <th>Rewritten Caption</th>
-      <th>Preview</th>
-    </tr>
-  </table>
+  <!-- Input + Button -->
+  <div class="flex space-x-2 mb-8 w-full max-w-md">
+    <input id="tiktokUrl"
+           type="text"
+           placeholder="Paste TikTok URL here"
+           class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+    <button id="cloneBtn" onclick="submit()" class="btn-neon">
+      Clone Video
+    </button>
+  </div>
+  <p id="status" class="text-gray-500 mb-6"></p>
+
+  <!-- Simple Card Container -->
+  <div id="cards" class="w-full max-w-xl grid gap-4">
+    <!-- Cards will appear here -->
+  </div>
 
   <script>
-    // Point this at your Render backend
-    const API_BASE = 'https://viral-video-clone-app.onrender.com';
+    const API = 'https://viral-video-clone-app.onrender.com';
 
-    // Kick off processing a new TikTok
     async function submit() {
-      const url = document.getElementById('tiktokUrl').value;
-      document.getElementById('status').innerText = '⏳ Processing...';
+      const url = document.getElementById('tiktokUrl').value.trim();
+      if (!url) return alert('Please paste a TikTok URL!');
+      document.getElementById('status').innerText = '⏳ Processing…';
+      const res = await fetch(`${API}/process`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tiktokUrl:url })
+      });
+      const { message } = await res.json();
+      document.getElementById('status').innerText = message;
+      fetchCards();
+    }
 
-      try {
-        const res = await fetch(`${API_BASE}/process`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tiktokUrl: url })
-        });
-        const data = await res.json();
-        document.getElementById('status').innerText = data.message;
-        fetchVideos();
-      } catch (err) {
-        document.getElementById('status').innerText = '❌ Error processing request';
-        console.error(err);
+    async function fetchCards() {
+      const table = 'https://api.airtable.com/v0/YOUR_BASE_ID/Videos';
+      const res = await fetch(table, {
+        headers:{ Authorization:'Bearer YOUR_API_KEY' }
+      });
+      const { records } = await res.json();
+      const cards = document.getElementById('cards');
+      cards.innerHTML = '';  // clear
+      for (let r of records) {
+        const f = r.fields;
+        const card = document.createElement('div');
+        card.className = 'glass p-4 flex items-center space-x-4';
+        card.innerHTML = `
+          <img src="${f.ThumbnailURL}" class="w-16 h-16 object-cover rounded" />
+          <div class="flex-1">
+            <p class="font-medium">${f.Status}</p>
+            <p class="text-sm text-gray-700">${(f.GPTRewrite||'').slice(0,40)}…</p>
+          </div>`;
+        cards.append(card);
       }
     }
 
-    // Load all processed videos from Airtable
-    async function fetchVideos() {
-      const res = await fetch('https://api.airtable.com/v0/YOUR_BASE_ID/Videos', {
-        headers: { 'Authorization': 'Bearer YOUR_API_KEY' }
-      });
-      const json = await res.json();
-      const rows = json.records.map(r => `
-        <tr>
-          <td><a href="${r.fields.TikTokURL}" target="_blank">View</a></td>
-          <td>${r.fields.Status}</td>
-          <td>${(r.fields.Transcript||'').slice(0,50)}…</td>
-          <td>${(r.fields.GPTRewrite||'').slice(0,50)}…</td>
-          <td>${r.fields.FinalVideoURL
-             ? `<a href="${r.fields.FinalVideoURL}" target="_blank">▶️</a>` 
-             : ''}</td>
-        </tr>
-      `).join('');
-      document.getElementById('videoTable').innerHTML = `
-        <tr>
-          <th>TikTok URL</th><th>Status</th>
-          <th>Transcript</th><th>Rewritten Caption</th><th>Preview</th>
-        </tr>` + rows;
-    }
-
-    // Fetch on page load
-    fetchVideos();
+    // initial load
+    fetchCards();
   </script>
 </body>
 </html>
+

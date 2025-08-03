@@ -2,113 +2,161 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Viral Video Cloner</title>
-  <!-- Tailwind via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>🎥 Clone & Republish</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* Glass effect */
-    .glass {
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(10px);
-      border-radius: 12px;
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 0 10px;
     }
-    /* Neon button */
-    .btn-neon {
-      background: linear-gradient(90deg, #0077ff, #ff0055);
-      color: white;
-      padding: .5rem 1rem;
-      border-radius: .5rem;
-      transition: transform .2s, box-shadow .2s;
+    input, button {
+      padding: 8px;
+      margin: 4px 0;
+      width: 100%;
+      box-sizing: border-box;
     }
-    .btn-neon:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 10px #ff0055, 0 0 20px #0077ff;
+    #gallery {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      margin-top: 20px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px;
+      margin: 8px;
+      width: 200px;
+      text-align: center;
+    }
+    .thumb {
+      max-width: 100%;
+      border-radius: 4px;
+    }
+    .play-btn {
+      display: block;
+      margin-top: 8px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    #message {
+      min-height: 1.5em;
+      color: #444;
     }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+<body>
+  <h1>🎥 Clone & Republish</h1>
+  <p>Paste any TikTok link below, and AI will rewrite, generate an avatar video, then post to 9 platforms.</p>
 
-  <!-- Header -->
-  <h1 class="text-3xl font-bold mb-4">🎬 Clone & Republish</h1>
-  <p class="text-gray-600 mb-6 text-center max-w-md">
-    Paste any TikTok link below, and AI will rewrite, generate an avatar video, then post to 9 platforms.
-  </p>
+  <form id="clone-form">
+    <input
+      type="url"
+      id="url-input"
+      placeholder="https://www.tiktok.com/…"
+      required
+    />
+    <input
+      type="email"
+      id="email-input"
+      placeholder="your email"
+      required
+    />
+    <button type="submit" id="clone-btn">Clone Video</button>
+  </form>
 
-  <!-- Input + Button -->
-    <!-- Input + Button Section -->
-  <div class="flex flex-col space-y-2 mb-8 w-full max-w-md">
-    <input id="tiktokUrl"
-           type="text"
-           placeholder="Paste TikTok URL here"
-           class="px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-    <input id="email"
-           type="email"
-           placeholder="Your email address"
-           class="px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-    <button id="cloneBtn"
-            onclick="submit()"
-            class="btn-neon py-2">
-      Clone Video
-    </button>
-  </div>
-  <p id="status" class="text-gray-500 mb-6"></p>
+  <p id="message"></p>
 
+  <!-- Gallery container -->
+  <div id="gallery"></div>
 
-  <!-- Simple Card Container -->
-  <div id="cards" class="w-full max-w-xl grid gap-4">
-    <!-- Cards will appear here -->
-  </div>
+  <!-- Template for one video card -->
+  <template id="card-tpl">
+    <div class="card">
+      <img class="thumb" alt="video thumbnail" />
+      <h4 class="status"></h4>
+      <p class="caption"></p>
+      <a class="play-btn" target="_blank"></a>
+    </div>
+  </template>
 
   <script>
-    const API = 'https://viral-video-clone-app.onrender.com';
+    // Your Render backend URL
+    const API_BASE = "https://viral-video-clone-app.onrender.com";
 
-  async function submit() {
-  const url   = document.getElementById('tiktokUrl').value.trim();
-  const email = document.getElementById('email').value.trim();
-  const status = document.getElementById('status');
+    // 1) Fetch & display the last 10 videos from Airtable
+    async function loadVideos() {
+      try {
+        const res = await fetch(`${API_BASE}/videos`);
+        if (!res.ok) throw new Error("Could not fetch videos");
+        const videos = await res.json();
 
-  if (!url || !email) {
-    status.innerText = '⚠️ TikTok URL and email are required';
-    return;
-  }
+        const gallery = document.getElementById("gallery");
+        gallery.innerHTML = "";
 
-  status.innerText = '⏳ Processing…';
+        const tpl = document.getElementById("card-tpl");
+        videos.forEach(v => {
+          const card = tpl.content.cloneNode(true);
+          card.querySelector(".thumb").src = v.fields.ThumbnailURL;
+          card.querySelector(".status").textContent = v.fields.Status;
+          card.querySelector(".caption").textContent = v.fields.GPTRewrite;
 
-  try {
-    const res = await fetch(`${API}/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tiktokUrl: url, email })
+          const playBtn = card.querySelector(".play-btn");
+          if (v.fields.FinalVideoURL) {
+            playBtn.href = v.fields.FinalVideoURL;
+            playBtn.textContent = "▶️ Watch";
+          } else {
+            playBtn.href = "#";
+            playBtn.textContent = "⌛️ Pending";
+          }
+
+          gallery.appendChild(card);
+        });
+      } catch (err) {
+        console.error(err);
+        document.getElementById("message").textContent = "Failed to load videos";
+      }
+    }
+
+    // 2) Handle the “Clone Video” form
+    document.getElementById("clone-form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const url = document.getElementById("url-input").value.trim();
+      const email = document.getElementById("email-input").value.trim();
+      const msg = document.getElementById("message");
+
+      if (!url || !email) {
+        msg.textContent = "TikTok URL and email are required";
+        return;
+      }
+
+      msg.textContent = "Processing…";
+
+      try {
+        const res = await fetch(`${API_BASE}/process`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tiktokUrl: url, email })
+        });
+        if (!res.ok) throw new Error("Server error");
+
+        msg.textContent = "✅ Content processed and saved.";
+        // reload the gallery so the new item shows up
+        await loadVideos();
+      } catch (err) {
+        console.error(err);
+        msg.textContent = "Internal Server Error";
+      }
     });
-    const { message } = await res.json();
-    status.innerText = message;
-    fetchCards();  // reload results
-  } catch (err) {
-    console.error(err);
-    status.innerText = '❌ Error processing request';
-  }
-}
 
-async function fetchCards() {
-  const res = await fetch(`${API}/videos`);
-  const records = await res.json();
-  const cards = document.getElementById('cards');
-  cards.innerHTML = '';
-  for (let f of records) {
-    const card = document.createElement('div');
-    card.className = 'glass p-4 flex items-center space-x-4';
-    card.innerHTML = `
-      <img src="${f.ThumbnailURL}" class="w-16 h-16 object-cover rounded" />
-      <div class="flex-1">
-        <p class="font-medium">${f.Status}</p>
-        <p class="text-sm text-gray-700">${(f.GPTRewrite||'').slice(0,40)}…</p>
-      </div>`;
-    cards.append(card);
-  }
-}
+    // 3) When the page loads, fetch & show cards
+    window.addEventListener("DOMContentLoaded", loadVideos);
+  </script>
+</body>
+</html>
 
-    // initial load
     fetchCards();
   </script>
 </body>
